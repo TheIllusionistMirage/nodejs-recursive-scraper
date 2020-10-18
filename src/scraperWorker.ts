@@ -59,7 +59,7 @@ const scraperAction = async (url: string, domain: string = 'https://medium.com')
     });
 
     for (const urlLink of urlsFound) {
-        logger.debug('Handling url:', urlLink);
+        logger.info('Handling url:', urlLink);
 
         const urlComponents = urlLink.split('?');
         const urlWithPath = urlComponents[0]; // The substring BEFORE the '?' is the URL path
@@ -133,8 +133,8 @@ const scraperAction = async (url: string, domain: string = 'https://medium.com')
         }
     }
 
-    logger.debug('Found these new URLs to scrape:');
-    logger.debug(urlsToScrape);
+    logger.info('Found these new URLs to scrape:');
+    logger.info(urlsToScrape);
 }
 
 workerpool.worker({

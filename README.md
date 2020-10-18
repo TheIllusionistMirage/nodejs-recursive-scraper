@@ -87,3 +87,9 @@ This scraper has overlooked several things, some of which include the following:
 * Ignores subdomains totally, meaning links like `https://blog.medium.com` are not considered at all.
 * Reacting to the response statuses 401 (unauthorized to access page), 404 (page not found) and 429 (too many requests). Depending upon the use case in the real world, there are different ways to react to these status codes.
 * The CRUD API abstraction used for interacting with the database is not efficient. It fetches required data in pieces instead of requesting them in one go. As a result, we have several queries that can be replaced with a single query.
+
+## Screenshot
+
+Demonstration of the result of a sample run:
+
+![alt text](screenshot.png "The database contents after a sample run")
