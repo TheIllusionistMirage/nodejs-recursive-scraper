@@ -16,7 +16,7 @@ $ cd nodejs-recursive-scraper
 Start the database Docker containers for the database instance (MySQL) and Adminer (to easily view the data in the database) using `docker-compose`:
 
 ```
-$ docker-compose-db.yml
+$ docker-compose -f docker-compose-db.yml up
 ````
 
 Wait for MySQL to start up and once ready, you can now navigate to `http://localhost:8080` and login to Adminer using these credentials.
