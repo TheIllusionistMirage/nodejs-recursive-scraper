@@ -45,6 +45,7 @@ Build the container image for the scraper
 
 ```
 $ chmod +x build-scraper-container.sh
+$ ./build-scraper-container.sh
 ```
 
 There are two `docker-compose` scripts that contain the database (MySQL), a DB viwer (Adminer) (`docker-compose-db.yml`), and the other image contains the scraper (`docker-compose-app.yml`). 
