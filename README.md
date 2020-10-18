@@ -4,7 +4,7 @@ A simple asynchronous recursive scraper using NodeJS for scraping websites in Ty
 
 # Running locally
 
-Running locally requires `docker` and `docker-compose` installed.
+Running locally requires `docker` and `docker-compose` installed. Regardless of running natively or via Docker, the database is provisioned using Docker.
 
 Clone this repository
 
@@ -12,6 +12,34 @@ Clone this repository
 $ git clone https://github.com/TheIllusionistMirage/nodejs-recursive-scraper
 $ cd nodejs-recursive-scraper
 ```
+
+Start the database Docker containers for the database instance (MySQL) and Adminer (to easily view the data in the database) using `docker-compose`:
+
+```
+$ docker-compose-db.yml
+````
+
+Wait for MySQL to start up and once ready, you can now navigate to `http://localhost:8080` and login to Adminer using these credentials.
+
+You can navigate to the table `scraped_results_table` at `http://localhost:8080/?server=dbMysql&username=root&db=scraped_results&select=scraped_results_table`. It is a very simple table with the required fields. And initially, there is no data.
+
+## Natively
+
+To run the scraper, install the NodeJS depenendencies
+
+```
+$ npm install
+```
+
+Run the scraper
+
+```
+$ npm run start:local
+```
+
+This will run scraper once for `https://medium.com`. You can see it in action by refreshing the page for `scraped_results_table` every few seconds and you should see it getting populated slowly.
+
+## Docker
 
 Build the container image for the scraper
 
@@ -21,22 +49,7 @@ $ chmod +x build-scraper-container.sh
 
 There are two `docker-compose` scripts that contain the database (MySQL), a DB viwer (Adminer) (`docker-compose-db.yml`), and the other image contains the scraper (`docker-compose-app.yml`). 
 
-There are two steps to running the scraper. First, launch the containers for running the DB:
-
-```
-$ docker-compose -f docker-compose-db.yml up
-```
-
-You can now navigate to `http://ocalhost:8080` and login to Adminer using these credentials:
-
-* System: MySQL
-* Server: dbMysql
-* Username: root
-* Password: password
-* Database: scraped_results
-
-You can navigate to the table `scraped_results_table` (alternatively [user this URL](http://localhost:8080/?server=dbMysql&username=root&db=scraped_results&select=scraped_results_table)). It's a very simple table with the required fields. There is not data yet.
-
+There are two steps to running the scraper. First, launch the containers for running the DB and Adminer as stated in the previous section.
 
 Once it is up, and MySQL has started running, we can run the scraper. The scraper is a CLI NodeJS app, so it will run and immediately exit once the scraping process is complete.
 
@@ -46,7 +59,7 @@ $ docker-compose -f docker-compose-app.yml up
 
 This will start the container for the scraper. You can see it in action by refreshing the page for `scraped_results_table` every few seconds and you should see it getting populated slowly.
 
-# Appraoch
+# Approach
 
 ## Tech used
 
@@ -70,6 +83,6 @@ The source code (which can be found under `src`) is pretty self explanatory and 
 
 This scraper has overlooked several things, some of which include the following:
 
-* Ignores subdomains totally, meaning links like `https://blog.medium.com/` are not considered at all.
+* Ignores subdomains totally, meaning links like `https://blog.medium.com` are not considered at all.
 * Reacting to the response statuses 401 (unauthorized to access page), 404 (page not found) and 429 (too many requests). Depending upon the use case in the real world, there are different ways to react to these status codes.
 * The CRUD API abstraction used for interacting with the database is not efficient. It fetches required data in pieces instead of requesting them in one go. As a result, we have several queries that can be replaced with a single query.
