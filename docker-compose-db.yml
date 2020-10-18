@@ -11,13 +11,21 @@ services:
       MYSQL_DATABASE: scraped_results
     command: --init-file /data/init.sql
     volumes:
-        - ./init.sql:/data/init.sql
-        - ./my.cnf:/etc/mysql/conf.d/my.cnf
+        - ./artefacts/database/init.sql:/data/init.sql
+        - ./artefacts/database/my.cnf:/etc/mysql/conf.d/my.cnf
     ports:
       - 3306:3306
+    networks:
+      - test
 
   adminer:
     image: adminer
     restart: always
     ports:
       - 8080:8080
+    networks:
+      - test
+  
+networks:
+  test:
+    driver: bridge

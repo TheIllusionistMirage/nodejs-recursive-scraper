@@ -41,13 +41,12 @@ logger.attachTransport(
 
 // Initialize database connection pool
 
-// TODO: Read them from env
 export const dbConnectionPool = mysql.createPool({
     connectionLimit: 5,
-    host: 'localhost',
-    user: 'root',
-    password: 'password',
-    database: 'scraped_results'
+    host: process.env.HOST,
+    user: process.env.MYSQL_USER,
+    password: process.env.MYSQL_USER_PASSWORD,
+    database: process.env.DATABASE
 });
 
 // Initialize data store abstraction

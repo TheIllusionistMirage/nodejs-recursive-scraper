@@ -7,7 +7,8 @@
     "prebuild": "tslint -c tslint.json -p tsconfig.json --fix",
     "build": "tsc",
     "prestart": "npm run build",
-    "start": "npm run build && node dist/index.js",
+    "start:local": "npm run build && HOST=localhost MYSQL_USER=root MYSQL_USER_PASSWORD=password DATABASE=scraped_results node dist/index.js",
+    "start:docker": "node dist/index.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "repository": {
