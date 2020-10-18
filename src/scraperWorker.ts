@@ -1,48 +1,26 @@
-import { Logger } from "tslog";
 import axios, { AxiosResponse } from 'axios';
 import cheerio from 'cheerio';
-
 import workerpool from 'workerpool';
 
-import { dataStore } from './globals';
+import { logger, dataStore } from './globals';
 
-const log: Logger = new Logger({
-    minLevel: "info"
-});
 
 const scraperAction = async (url: string, domain: string = 'https://medium.com') => {
-    // log.info(`Scraping: ${url}...`);
     // Fetch the HTML code for the webpage pointed to by <url>
     let response: AxiosResponse<any>;
 
     try {
         response = await axios.get(url);
     } catch (error) {
-        log.error(`Something went wrong while trying to scrape URL: ${url}, NOT RETRYING`);
+        // If we get either of the following we totally ignore them
+        // (in a production case, we would have retry logic or handle
+        // this exception to act according to business requirements)
+        logger.warn(`Got a 401, or 404, or 429 while trying to GET URL: ${url}, ignoring and NOT RETRYING`);
         return;
     }
 
-    // log.info('Response code:', response.status);
-    if (response.status === 404) {
-        log.error(`Received a 404, ignoring URL: ${url}`);
-        return;
-    }
-    else if (response.status === 401) {
-        log.error(`Received a 401, ignoring URL: ${url}`);
-        // throw Error('Received a 429, retry period:' + JSON.stringify(response.headers));
-        return;
-    }
-    else if (response.status === 429) {
-        log.error(`Received a 429, ignoring URL: ${url}`);
-        // throw Error('Received a 429, retry period:' + JSON.stringify(response.headers));
-        return;
-    }
+    // Control reaches here means, GET succeeded with 200
 
-    if (response.status !== 404 && response.status !== 401 && response.status !== 429 && response.status !== 200) {
-        const message = `Failed at GET-ing the HTML page for the URL: ${url}`;
-        log.error(message);
-        throw Error(message);
-    }
     const body: string = response.data;
 
     // Get hold of all the <a> tags in the page
@@ -80,44 +58,52 @@ const scraperAction = async (url: string, domain: string = 'https://medium.com')
         }
     });
 
-    // urlsFound.forEach(async (urlLink) => {
     for (const urlLink of urlsFound) {
-        log.debug('Handling url:', urlLink);
+        logger.debug('Handling url:', urlLink);
+
         const urlComponents = urlLink.split('?');
         const urlWithPath = urlComponents[0]; // The substring BEFORE the '?' is the URL path
         const parametersAndValues = urlComponents[1]; // The substring AFTER the '?' contains the parameters (and their values)
         const params = new Array<string>();
 
-        // const foo = await dataStore.containsEntry(urlWithPath)
-        // log.debug('URL:', urlWithPath, ' existence:', foo);
+        // In the following blocks, we populate/update the DB with
+        // the parameter and reference count info for the URLs found
+        // on this page.
+        // Note: The process of looking up existing URLs in the DB
+        // and updating the DB is not the most efficient. This will
+        // need more optimization if considering a production use case.
+
+        // If it is the first time we are encountering
+        // this URL, we add it to the scraper results DB
         if (!(await dataStore.containsEntry(urlWithPath))) {
             if (parametersAndValues) {
                 parametersAndValues.split('&').forEach(paramValuePair => params.push(paramValuePair.split('=')[0]));
             }
 
-            // NOTE!!!!
-            // Sometimes key already added by another instance so this fails!
-            // Check if key exists and add it
-            // await dataStore.createEntry(urlWithPath, 1, params).catch(error => {
-            //     log.error(`Failed to insert entry for URL: ${urlWithPath}, reference count: 1 and parameters: ${params.toString()}`);
-            // });
-
+            // We actually test if record exists again since multiple
+            // workers are updating the DB, and there's a fair chance
+            // that we might end up attempting to insert the same
+            // URL more than once.
+            // Again, for a production use case, there needs to be
+            // better and more comprehensive checks
             await dataStore.createOrUpdateEntry(urlWithPath, 1, params);
 
             urlsToScrape.push(urlLink);
 
-            // test
             await scraperAction(urlLink).catch(err => {
-                log.error(`Error(s) occurred while trying to scrape ${urlLink}}, NOT RETRYING: ${err.message}`);
+                logger.error(`Error(s) occurred while trying to scrape ${urlLink}}, NOT RETRYING: ${err.message}`);
             });
         }
+        // If we have already encountered this URL before, increment
+        // the reference count of the URL also add any new parameters
+        // that might have been present in this particular occurence
+        // of the URL
         else {
             const [referenceCount, existingParams] = await dataStore.getReferenceCountAndParameters(urlWithPath);
 
             if (!existingParams) {
-                // Error
                 const message = `Database in an inconsistent state for URL: ${urlWithPath}`;
-                log.error(message);
+                logger.error(message);
                 throw Error(message);
             }
 
@@ -134,7 +120,7 @@ const scraperAction = async (url: string, domain: string = 'https://medium.com')
 
                             // test
                             await scraperAction(urlLink).catch(err => {
-                              log.error(`Error(s) occurred while trying to scrape ${urlLink}}, NOT RETRYING: ${err.message}`);
+                              logger.error(`Error(s) occurred while trying to scrape ${urlLink}}, NOT RETRYING: ${err.message}`);
                             });
                         }
                     }
@@ -142,29 +128,13 @@ const scraperAction = async (url: string, domain: string = 'https://medium.com')
             }
 
             await dataStore.updateEntry(urlWithPath, referenceCount + 1, existingParams.concat(params)).catch(error => {
-                log.error(`Failed to update entry for URL: ${urlWithPath}, reference count: ${referenceCount} and parameters: ${params.toString()}`);
+                logger.error(`Failed to update entry for URL: ${urlWithPath}, reference count: ${referenceCount} and parameters: ${params.toString()}`);
             });
         }
     }
-    // });
 
-    log.debug('Found these new URLs to scrape:');
-    log.debug(urlsToScrape);
-
-    // for (const urlLink of urlsToScrape) {
-    //     // test
-    //     await scraperAction(dataStore, urlLink).catch(err => {
-    //         log.error(`Error(s) occurred while trying to scrape ${urlLink}}:`);
-    //         log.error(JSON.stringify(err));
-    //     });
-    // }
-    // urlsToScrape.forEach(urlLink => {
-    //     // test
-    //     workerPool.exec(scraperAction, [urlLink]).catch(err => {
-    //         log.error(`Error(s) occurred while trying to scrape ${urlLink}}:`);
-    //         log.error(JSON.stringify(err));
-    //     });
-    // });
+    logger.debug('Found these new URLs to scrape:');
+    logger.debug(urlsToScrape);
 }
 
 workerpool.worker({
