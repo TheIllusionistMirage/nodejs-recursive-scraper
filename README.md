@@ -50,11 +50,13 @@ This will start the container for the scraper. You can see it in action by refre
 
 ## Tech used
 
-This scraper is written in Typescript and NodeJS. It uses a containerized MySQL database to store the results of the scraping process.
+This scraper is written in Typescript and NodeJS. It uses a containerized MySQL database to store the results of the scraping process. It additionally uses the [workerpool](https://github.com/josdejong/workerpool) library that implements the thread pool pattern. This library is used to maintain a pool of five "scraper" workers. This ensures that at most five scraper actions are running at a given time and newer jobs get queued in the internal job queue of `workerpool` and wait for their turn to get processed.
 
 ## The strategy used for recursive scraping
 
 We start with the root URL `https://example.com`. We fetch the HTML code for the webpage and determine all hyperlinks (`<a href=...>` attributes). Then we check which of these hyperlinks are a part of `https://example.com` (let us call them "valid links") , e.g., `https://example.com/foo` is a valid path of `https://example.com` but `https://twitter.com` is not. Then we check if any of the valid links are not present in the database. If it is present, we simply increment its reference count by one, and then check if it has any new unique parameters. If it does, we append them to the record as well and update the database. The valid links which are not yet recorded in the database, we create new records for them, setting the reference count as one, and storing whatever parameters we found in these valid links. We repeat this process recurively repeat this for each valid link we found on a page. The base case is that if in a page we did not find any new unique valid links, i.e., valid links that are not already recorded in the database, and, if we did not find any currently recorded valid link with a new and unique parameter. If both these conditions are met, we don't scrape any valid links present in the page in question.
+
+Initiating a scraping action does not block the main event loop thread of NodeJS. This done by sideloading each scraping action in a child worker using `workerpool` and the main event loop thread is free to do other things.
 
 The source code (which can be found under `src`) is pretty self explanatory and there are four modules:
 
@@ -63,9 +65,11 @@ The source code (which can be found under `src`) is pretty self explanatory and 
 * scraperWorker: This contains the definition of a worker that represents the action of scraping a web page
 * index: This is the main entry point of the scraper CLI
 
+
 ## Shorcuts taken
 
 This scraper has overlooked several things, some of which include the following:
 
+* Ignores subdomains totally, meaning links like `https://blog.medium.com/` are not considered at all.
 * Reacting to the response statuses 401 (unauthorized to access page), 404 (page not found) and 429 (too many requests). Depending upon the use case in the real world, there are different ways to react to these status codes.
 * The CRUD API abstraction used for interacting with the database is not efficient. It fetches required data in pieces instead of requesting them in one go. As a result, we have several queries that can be replaced with a single query.
